@@ -28,7 +28,7 @@ EPS_CLIP = 0.2
 VALUE_LOSS_COEF = 1.0    
 
 TARGET_KL = 0.04        
-LR = 0.0003            
+LR = 0.3            
 LR_DECAY_ITERS = 2500    
 MIN_LR = 0.004           
 BETA2 = 0.99             
@@ -144,28 +144,6 @@ class PPOBuffer:
             self.returns[:self.cur_idx]
         )
 
-def evaluate_policy(env, policy, device, n_episodes=EVAL_EPISODES):
-    rewards = []
-    for _ in range(n_episodes):
-        obs, _ = env.reset()
-        done = False
-        episode_reward = 0
-        
-        while not done:
-            with torch.no_grad():
-                state_tensor = preprocess_observation(obs).unsqueeze(0).to(device)
-                action_logits, _ = policy(state_tensor)
-                action = torch.argmax(action_logits, dim=-1)
-            
-            obs, reward, done, truncated, _ = env.step(action.item())
-            episode_reward += reward
-            if truncated:
-                break
-        
-        rewards.append(episode_reward)
-    
-    return np.mean(rewards), np.std(rewards)
-
 def ppo_update(policy, optimizer, obs, actions, old_logprobs, advantages, returns):
     """
     Update policy using the PPO algorithm.
@@ -243,6 +221,28 @@ def ppo_update(policy, optimizer, obs, actions, old_logprobs, advantages, return
         np.mean(entropy_losses)
     )
 
+def evaluate_policy(env, policy, device, n_episodes=EVAL_EPISODES):
+    rewards = []
+    for _ in range(n_episodes):
+        obs, _ = env.reset()
+        done = False
+        episode_reward = 0
+        
+        while not done:
+            with torch.no_grad():
+                state_tensor = preprocess_observation(obs).unsqueeze(0).to(device)
+                action_logits, _ = policy(state_tensor)
+                action = torch.argmax(action_logits, dim=-1)
+            
+            obs, reward, done, truncated, _ = env.step(action.item())
+            episode_reward += reward
+            if truncated:
+                break
+        
+        rewards.append(episode_reward)
+    
+    return np.mean(rewards), np.std(rewards)
+
 def collect_rollouts(env, policy, buffer, n_rollout_steps, device):
     """
     Collect experiences using the current policy and fill the rollout buffer.
@@ -267,10 +267,12 @@ def collect_rollouts(env, policy, buffer, n_rollout_steps, device):
         with torch.no_grad():
             state_tensor = preprocess_observation(obs).unsqueeze(0).to(device)
             action_logits, value = policy(state_tensor)
-            
+
             dist = Categorical(logits=action_logits)
-            action = dist.sample()
+            action = torch.argmax(action_logits, dim=-1)
             log_prob = dist.log_prob(action)
+
+            action = torch.argmax(action_logits, dim=-1)
             
             next_obs, reward, done, truncated, info = env.step(action.item())
             episode_reward += reward
@@ -288,7 +290,6 @@ def collect_rollouts(env, policy, buffer, n_rollout_steps, device):
             obs = next_obs
             
             if done or truncated:
-                print(f"Episode finished. Length: {episode_length}, Reward: {episode_reward}")
                 obs, _ = env.reset()
                 episode_reward = 0
                 episode_length = 0
@@ -296,6 +297,8 @@ def collect_rollouts(env, policy, buffer, n_rollout_steps, device):
     with torch.no_grad():
         _, last_value = policy(preprocess_observation(obs).unsqueeze(0).to(device))
         last_value = last_value.item()
+
+    print(f"Episode finished. Length: {episode_length}, Reward: {episode_reward}")
     
     buffer.compute_returns_and_advantages(last_value)
     
