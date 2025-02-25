@@ -1,0 +1,6 @@
+gymnasium
+torch
+numpy
+opencv-python
+imageio
+pillow

@@ -29,7 +29,6 @@ MLP_EXPANSION = 1
 TARGET_KL = 0.04
      
 CHECKPOINT_DIR = "checkpoints"
-LOG_DIR = "logs"
 
 def preprocess_observation_text(obs):
     """
