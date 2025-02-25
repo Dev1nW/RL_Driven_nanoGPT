@@ -9,6 +9,8 @@ This project leverages a Generative Pretrained Transformer (GPT) as the backbone
 
 ## Performance
 
+This is a video of the performance after 4,000,000 timesteps!
+
 ![gpt_video](gpt.gif)
 
 ## Features
